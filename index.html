@@ -208,7 +208,7 @@
         const START_HOURS = []; for(let i=8; i<=15; i++) START_HOURS.push(String(i).padStart(2,'0'));
         const END_HOURS = []; for(let i=12; i<=21; i++) END_HOURS.push(String(i).padStart(2,'0'));
 
-        // === [중요] 날짜 키 생성 함수 (시차 문제 해결) ===
+        // === 날짜 키 생성 (시차 문제 해결) ===
         function getLocalKey(dateObj) {
             const year = dateObj.getFullYear();
             const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -316,13 +316,12 @@
             const monday = getMonday(currentViewDate);
             const weekDates = [];
             const dayNames = ['월', '화', '수', '목', '금'];
-            const todayKey = getLocalKey(new Date()); // 로컬 키 사용
+            const todayKey = getLocalKey(new Date());
             
             thead.innerHTML = '<th class="name-col">이름</th>';
             for(let i=0; i<5; i++) {
                 let d = new Date(monday);
                 d.setDate(monday.getDate() + i);
-                // 수정됨: getLocalKey 사용
                 let dateStr = getLocalKey(d);
                 weekDates.push({ date: d, key: dateStr });
                 let th = document.createElement('th');
@@ -330,6 +329,7 @@
                 if(dateStr === todayKey) th.classList.add('today-header');
                 thead.appendChild(th);
             }
+            // [수정] 월별 주차 계산 로직 변경 (Week of Month)
             document.getElementById('weekTitle').innerText = `${monday.getMonth()+1}월 ${getWeekNumber(monday)}주차 입력`;
 
             window.members.forEach(mObj => {
@@ -343,8 +343,8 @@
                     let typeHtml = `
                         <select id="${idBase}_type" onchange="handleTypeChange('${day.key}', '${mObj.name}', this.value)" style="width:100%; margin-bottom:4px;">
                             <option value="work" ${data.type==='work'?'selected':''}>🔵 정상</option>
-                            <option value="half_am" ${data.type==='half_am'?'selected':''}>🟡 오전반</option>
-                            <option value="half_pm" ${data.type==='half_pm'?'selected':''}>🟠 오후반</option>
+                            <option value="half_am" ${data.type==='half_am'?'selected':''}>🟡 오전반차</option>
+                            <option value="half_pm" ${data.type==='half_pm'?'selected':''}>🟠 오후반차</option>
                             <option value="q_am" ${data.type==='q_am'?'selected':''}>🌓 오전반반</option>
                             <option value="q_pm" ${data.type==='q_pm'?'selected':''}>🌗 오후반반</option>
                             <option value="vacation" ${data.type==='vacation'?'selected':''}>🔴 연차</option>
@@ -410,7 +410,6 @@
                 let dayOfWeek = dateObj.getDay();
                 if(dayOfWeek === 0 || dayOfWeek === 6) continue;
 
-                // 수정됨: getLocalKey 사용
                 let dateKey = getLocalKey(dateObj);
                 
                 let html = `<div class="cal-cell ${dateKey===todayKey?'cal-today':''}">
@@ -544,7 +543,16 @@
             setTimeout(()=> t.className=t.className.replace("show",""), 2000);
         }
         function getMonday(d) { d=new Date(d); let day=d.getDay(), diff=d.getDate()-day+(day==0?-6:1); return new Date(d.setDate(diff)); }
-        function getWeekNumber(d) { let onejan=new Date(d.getFullYear(),0,1); return Math.ceil((((d-onejan)/86400000)+onejan.getDay()+1)/7); }
+
+        // [수정된 함수] 월 단위 주차 계산 (예: 2월 1일이 속한 주가 1주차)
+        function getWeekNumber(dateFrom) {
+            const currentDate = dateFrom.getDate();
+            const firstDay = new Date(dateFrom.setDate(1)).getDay();
+            // 해당 월의 1일이 일요일(0)이면 offset 0, 월요일(1)이면 offset 1...
+            // 한국식(행 기준): (날짜 + 1일의 요일 인덱스) / 7 올림
+            return Math.ceil((currentDate + firstDay) / 7);
+        }
+
         window.moveWeek = function(n) { currentViewDate.setDate(currentViewDate.getDate()+n*7); renderWeekView(); }
         window.moveMonth = function(n) { currentViewDate.setMonth(currentViewDate.getMonth()+n); renderMonthView(); }
     </script>
