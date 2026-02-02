@@ -175,7 +175,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // === 1. Firebase 설정 (주신 키 적용 완료) ===
+        // === 1. Firebase 설정 ===
         const firebaseConfig = {
             apiKey: "AIzaSyBmqhFcRdQ7kOuvEKrJzaKrKR5lWlcQ16w",
             authDomain: "dshare-attendance.firebaseapp.com",
@@ -185,7 +185,6 @@
             appId: "1:247107495551:web:8c58c06e368d241d43414a"
         };
 
-        // Firebase 초기화
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
@@ -201,34 +200,36 @@
             { name: "최윤서", defStart: "09:00", defEnd: "18:00" }
         ];
         
-        // 데이터 상태 (Firebase와 동기화됨)
         window.members = [];
         window.records = {};
         window.isAdmin = false;
 
         const MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
-        // 출근 08~15, 퇴근 12~21
         const START_HOURS = []; for(let i=8; i<=15; i++) START_HOURS.push(String(i).padStart(2,'0'));
         const END_HOURS = []; for(let i=12; i<=21; i++) END_HOURS.push(String(i).padStart(2,'0'));
 
-        // === 3. Firebase 실시간 리스너 연결 ===
-        // 앱 시작 시 실행
+        // === [중요] 날짜 키 생성 함수 (시차 문제 해결) ===
+        function getLocalKey(dateObj) {
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // === 3. Firebase 연결 ===
         async function initApp() {
-            // A. 멤버 데이터 리스너
             onSnapshot(doc(db, "dshare", "members"), (docSnap) => {
                 if (docSnap.exists()) {
                     window.members = docSnap.data().list;
                 } else {
-                    // 데이터 없으면 초기값 세팅
                     window.members = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
                     setDoc(doc(db, "dshare", "members"), { list: window.members });
                 }
-                renderAll(); // 데이터 바뀌면 화면 다시 그리기
+                renderAll();
             });
 
-            // B. 기록 데이터 리스너
             onSnapshot(doc(db, "dshare", "records"), (docSnap) => {
-                document.getElementById('loading').style.display = 'none'; // 로딩 끝
+                document.getElementById('loading').style.display = 'none';
                 if (docSnap.exists()) {
                     window.records = docSnap.data().data;
                 } else {
@@ -238,34 +239,29 @@
                 renderAll();
             });
         }
-        initApp(); // 실행
+        initApp();
 
-        // === 4. 화면 렌더링 함수들 ===
         function renderAll() {
             renderWeekView();
             renderMonthView();
             if(window.isAdmin) renderAdminMembers();
         }
 
-        // Firebase에 데이터 저장하는 함수 (LocalStorage 대체)
         async function saveRecordsToDB() {
             try {
                 await setDoc(doc(db, "dshare", "records"), { data: window.records }, { merge: true });
                 showToast();
-            } catch(e) { console.error("Error adding document: ", e); }
+            } catch(e) { console.error(e); }
         }
 
         async function saveMembersToDB() {
             try {
                 await setDoc(doc(db, "dshare", "members"), { list: window.members });
                 showToast();
-            } catch(e) { console.error("Error adding document: ", e); }
+            } catch(e) { console.error(e); }
         }
 
-        // ------------------------------------------
-        // 기존 UI 로직 (window. 함수로 변환하여 모듈 밖에서 호출 가능하게 함)
-        // ------------------------------------------
-
+        // === 4. UI 로직 ===
         window.switchTab = function(tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -274,11 +270,10 @@
             renderAll();
         }
 
-        // === 시간 선택기 생성 ===
         window.createTimeSelectHTML = function(idPrefix, timeValue, onChangeFuncStr, type) {
             let [h, m] = timeValue ? timeValue.split(':') : ["09", "00"];
             let hoursArr = (type === 'start') ? START_HOURS : END_HOURS;
-            if(!hoursArr.includes(h)) hoursArr = [...hoursArr, h].sort(); // 범위 밖 값 처리
+            if(!hoursArr.includes(h)) hoursArr = [...hoursArr, h].sort();
 
             let hOptions = hoursArr.map(val => `<option value="${val}" ${val==h?'selected':''}>${val}</option>`).join('');
             let mOptions = MINUTES.map(val => `<option value="${val}" ${val==m?'selected':''}>${val}</option>`).join('');
@@ -307,7 +302,6 @@
             const hEl = document.getElementById(`${idPrefix}_h`);
             const mEl = document.getElementById(`${idPrefix}_m`);
             if(hEl && mEl) {
-                // 옵션 없으면 추가
                 if(!Array.from(hEl.options).some(op=>op.value==h)) hEl.add(new Option(h,h));
                 hEl.value = h; mEl.value = m;
             }
@@ -322,16 +316,18 @@
             const monday = getMonday(currentViewDate);
             const weekDates = [];
             const dayNames = ['월', '화', '수', '목', '금'];
+            const todayKey = getLocalKey(new Date()); // 로컬 키 사용
             
             thead.innerHTML = '<th class="name-col">이름</th>';
             for(let i=0; i<5; i++) {
                 let d = new Date(monday);
                 d.setDate(monday.getDate() + i);
-                let dateStr = d.toISOString().split('T')[0];
+                // 수정됨: getLocalKey 사용
+                let dateStr = getLocalKey(d);
                 weekDates.push({ date: d, key: dateStr });
                 let th = document.createElement('th');
                 th.innerHTML = `${d.getMonth()+1}/${d.getDate()} (${dayNames[i]})`;
-                if(dateStr === new Date().toISOString().split('T')[0]) th.classList.add('today-header');
+                if(dateStr === todayKey) th.classList.add('today-header');
                 thead.appendChild(th);
             }
             document.getElementById('weekTitle').innerText = `${monday.getMonth()+1}월 ${getWeekNumber(monday)}주차 입력`;
@@ -367,13 +363,13 @@
         window.handleTypeChange = function(dateKey, name, typeVal) {
             updateRecord(dateKey, name, 'type', typeVal);
             document.getElementById(`cell_${dateKey}_${name}_time_box`).style.display = (typeVal==='vacation') ? 'none' : 'block';
-            saveRecordsToDB(); // DB 저장
+            saveRecordsToDB();
         }
 
         window.handleTimeChange = function(dateKey, name, which) {
             let idBase = `cell_${dateKey}_${name}`;
             let val = getTimeFromSelects(`${idBase}_${which}`);
-            if(which === 'start') { // 자동 퇴근 계산
+            if(which === 'start') {
                 let [h, m] = val.split(':').map(Number);
                 let endH = (h + 9) % 24;
                 let endStr = `${String(endH).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
@@ -381,7 +377,7 @@
                 updateRecord(dateKey, name, 'end', endStr);
             }
             updateRecord(dateKey, name, which, val);
-            saveRecordsToDB(); // DB 저장
+            saveRecordsToDB();
         }
 
         function updateRecord(date, name, field, val) {
@@ -405,7 +401,8 @@
             const firstDayObj = new Date(year, month, 1);
             let firstDayOfWeek = firstDayObj.getDay(); 
             let padding = (firstDayOfWeek >= 1 && firstDayOfWeek <= 5) ? firstDayOfWeek - 1 : 0;
-            
+            const todayKey = getLocalKey(new Date());
+
             for(let i=0; i<padding; i++) grid.innerHTML += `<div></div>`;
 
             for(let d=1; d<=lastDay; d++) {
@@ -413,8 +410,10 @@
                 let dayOfWeek = dateObj.getDay();
                 if(dayOfWeek === 0 || dayOfWeek === 6) continue;
 
-                let dateKey = dateObj.toISOString().split('T')[0];
-                let html = `<div class="cal-cell ${dateKey===new Date().toISOString().split('T')[0]?'cal-today':''}">
+                // 수정됨: getLocalKey 사용
+                let dateKey = getLocalKey(dateObj);
+                
+                let html = `<div class="cal-cell ${dateKey===todayKey?'cal-today':''}">
                     <span style="font-weight:bold; color:#555;">${d}일</span>
                     <div style="flex-grow:1; overflow-y:auto; display:flex; flex-direction:column; gap:4px;">`;
 
@@ -483,7 +482,7 @@
             updateRecord(date, name, 'type', type);
             updateRecord(date, name, 'start', start);
             updateRecord(date, name, 'end', end);
-            saveRecordsToDB(); // DB 저장
+            saveRecordsToDB();
             closeModal();
         }
 
@@ -520,7 +519,7 @@
         window.updateDef = function(idx, field) {
             let idPrefix = (field === 'defStart') ? `admin_def_start_${idx}` : `admin_def_end_${idx}`;
             window.members[idx][field] = getTimeFromSelects(idPrefix);
-            saveMembersToDB(); // 멤버 DB 저장
+            saveMembersToDB();
         };
 
         window.addMember = function() {
