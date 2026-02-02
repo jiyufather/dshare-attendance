@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D.Share 사업기획팀 근태관리 (공유형)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00AE99;
+            --primary-dark: #008c7a;
+            --bg: #f0f4f7;
+            --white: #ffffff;
+            --text: #2c3e50;
+            --border: #e1e4e8;
+            --danger: #ff6b6b;
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        body { font-family: 'Pretendard', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--text); }
+        h1 { color: var(--primary); text-align: center; margin-bottom: 30px; font-weight: 700; }
+
+        /* 탭 & 버튼 */
+        .tab-nav { display: flex; gap: 10px; margin-bottom: 25px; justify-content: center; }
+        .tab-btn { padding: 14px 28px; border: none; border-radius: 12px; background: #e9ecef; font-weight: 600; cursor: pointer; color: #7f8c8d; transition: 0.3s; font-size: 16px; }
+        .tab-btn:hover { background: #dfe4ea; }
+        .tab-btn.active { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-2px); }
+        
+        .tab-content { display: none; animation: fadeIn 0.4s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card { background: var(--white); border-radius: 16px; padding: 25px; box-shadow: var(--shadow-sm); margin-bottom: 25px; border: 1px solid white; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        
+        .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; font-family: 'Pretendard'; }
+        .btn-secondary { background: #f1f3f5; color: #495057; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-icon { padding: 6px 10px; font-size: 12px; background: #edf2f7; color: #555; }
+
+        select, input[type="text"] { padding: 8px; border: 1px solid var(--border); border-radius: 8px; font-family: 'Pretendard'; font-size: 13px; background: #fcfcfc; }
+        select:focus, input:focus { outline: none; border-color: var(--primary); }
+
+        .time-select-group { display: flex; align-items: center; gap: 4px; background: #f8f9fa; padding: 4px; border-radius: 6px; border: 1px solid #eee; margin-top: 4px; }
+        .time-select { padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: white; cursor: pointer; }
+        .time-separator { font-weight: bold; color: #888; font-size: 12px; }
+
+        .week-table-container { overflow-x: auto; border-radius: 12px; box-shadow: var(--shadow-sm); }
+        .week-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 900px; }
+        .week-table th, .week-table td { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); padding: 10px; text-align: center; vertical-align: top; background: white; }
+        .week-table th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; font-weight: 600; color: #555; }
+        .week-table .name-col { position: sticky; left: 0; z-index: 20; background: #f8f9fa; font-weight: 700; border-right: 2px solid var(--border); color: var(--text); min-width: 80px; }
+        .today-header { color: var(--primary) !important; font-weight: 800 !important; background: #e6f7f5 !important; }
+
+        .calendar-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+        .cal-day-header { text-align: center; font-weight: 600; padding: 10px; background: #f1f3f5; border-radius: 8px; margin-bottom: 10px; }
+        .cal-cell { background: white; border: 1px solid var(--border); border-radius: 12px; min-height: 120px; padding: 10px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow-sm); }
+        .cal-today { border: 2px solid var(--primary); background: #f0fcf9; }
+        .cal-member-tag { font-size: 11px; padding: 5px 8px; background: #f0f2f5; border-radius: 6px; border-left: 3px solid var(--primary); display: flex; justify-content: space-between; cursor: pointer; }
+        .cal-member-tag:hover { background: #e2e6ea; }
+        .cal-member-tag.default-val { border-left-color: #ccc; background: #f9f9f9; color: #888; }
+        .tag-vacation { border-left-color: var(--danger); background: #fff5f5; color: var(--danger); }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-overlay.active { display: flex; }
+        .modal-content { background: white; padding: 30px; border-radius: 16px; width: 90%; max-width: 400px; position: relative; }
+        .modal-close { position: absolute; top: 15px; right: 20px; font-size: 24px; cursor: pointer; color: #999; }
+        
+        #toast { visibility: hidden; min-width: 250px; margin-left: -125px; background-color: #333; color: #fff; text-align: center; border-radius: 25px; padding: 16px; position: fixed; z-index: 9999; left: 50%; bottom: 30px; font-size: 14px; }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+        .admin-list-item { background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .hidden { display: none !important; }
+
+        /* 로딩 인디케이터 */
+        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 2000; display: flex; justify-content: center; align-items: center; font-weight: bold; color: var(--primary); font-size: 1.2em; }
+    </style>
+</head>
+<body>
+
+    <div id="loading">데이터 불러오는 중...</div>
+
+    <h1>📅 D.Share 사업기획팀 근태관리</h1>
+
+    <div class="tab-nav">
+        <button class="tab-btn active" onclick="switchTab('week')">주간 보기 (입력)</button>
+        <button class="tab-btn" onclick="switchTab('month')">월간 보기 (캘린더)</button>
+        <button class="tab-btn" onclick="switchTab('admin')">⚙️ 관리자</button>
+    </div>
+
+    <div id="tab-week" class="tab-content active">
+        <div class="card">
+            <div class="card-header">
+                <h2 id="weekTitle">이번 주 근태 입력</h2>
+                <div>
+                    <button class="btn btn-secondary" onclick="moveWeek(-1)">◀ 이전주</button>
+                    <button class="btn btn-secondary" onclick="moveWeek(0)">오늘</button>
+                    <button class="btn btn-secondary" onclick="moveWeek(1)">다음주 ▶</button>
+                </div>
+            </div>
+            <p style="text-align:right; font-size:12px; color:var(--primary); font-weight:bold;">🟢 실시간 자동 저장/동기화 중</p>
+            <div class="week-table-container">
+                <table class="week-table">
+                    <thead><tr id="weekHeader"></tr></thead>
+                    <tbody id="weekBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-month" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <h2 id="monthTitle">2026년 2월</h2>
+                <div>
+                    <button class="btn btn-secondary" onclick="moveMonth(-1)">◀ 이전달</button>
+                    <button class="btn btn-secondary" onclick="moveMonth(1)">다음달 ▶</button>
+                </div>
+            </div>
+            <p style="text-align:right; font-size:12px; color:#999; margin-top:-10px;">* 회색: 기본값 / 색상: 저장된 값</p>
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 5px;">
+                <div class="cal-day-header">월</div><div class="cal-day-header">화</div><div class="cal-day-header">수</div><div class="cal-day-header">목</div><div class="cal-day-header">금</div>
+            </div>
+            <div id="calendarGrid" class="calendar-grid"></div>
+        </div>
+    </div>
+
+    <div id="tab-admin" class="tab-content">
+        <div id="adminLogin" class="card" style="text-align: center; padding: 60px 20px;">
+            <h3>🔒 관리자 접근</h3>
+            <button class="btn btn-primary" onclick="adminLogin()">로그인</button>
+        </div>
+        <div id="adminPanel" class="hidden">
+            <div class="card">
+                <h2>👥 인원 및 기본값 설정 (실시간 반영)</h2>
+                <div style="display:flex; gap:10px; margin-bottom: 25px;">
+                    <input type="text" id="newMemberName" placeholder="이름 입력" style="flex-grow:1;">
+                    <button class="btn btn-primary" onclick="addMember()">+ 추가</button>
+                </div>
+                <div id="memberListArea"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="editModal" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <h3 style="text-align:center; color:var(--primary); margin-top:0;">✏️ 근태 수정</h3>
+            <input type="hidden" id="modalDateKey">
+            <input type="hidden" id="modalMember">
+            <p id="modalInfoText" style="text-align:center; font-weight:bold; color:#555;"></p>
+            <div style="margin-bottom:15px;">
+                <label style="display:block; margin-bottom:5px; font-weight:600;">근무 형태</label>
+                <select id="modalType" style="width:100%" onchange="toggleModalTimeInputs()">
+                    <option value="work">🔵 정상출근</option>
+                    <option value="half_am">🟡 오전반차</option>
+                    <option value="half_pm">🟠 오후반차</option>
+                    <option value="q_am">🌓 오전반반</option>
+                    <option value="q_pm">🌗 오후반반</option>
+                    <option value="vacation">🔴 연차</option>
+                </select>
+            </div>
+            <div id="modalTimeGroup" style="margin-bottom:15px;">
+                <label style="display:block; margin-bottom:5px; font-weight:600;">시간 설정 (5분 단위)</label>
+                <div id="modalTimePickers"></div>
+            </div>
+            <button class="btn btn-primary" style="width:100%; padding:12px;" onclick="saveModalData()">저장하기</button>
+        </div>
+    </div>
+
+    <div id="toast">✅ 데이터 저장 완료</div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // === 1. Firebase 설정 (주신 키 적용 완료) ===
+        const firebaseConfig = {
+            apiKey: "AIzaSyBmqhFcRdQ7kOuvEKrJzaKrKR5lWlcQ16w",
+            authDomain: "dshare-attendance.firebaseapp.com",
+            projectId: "dshare-attendance",
+            storageBucket: "dshare-attendance.firebasestorage.app",
+            messagingSenderId: "247107495551",
+            appId: "1:247107495551:web:8c58c06e368d241d43414a"
+        };
+
+        // Firebase 초기화
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // === 2. 전역 변수 ===
+        let currentViewDate = new Date();
+        const DEFAULT_MEMBERS = [
+            { name: "신종원", defStart: "09:00", defEnd: "18:00" },
+            { name: "유재욱", defStart: "09:00", defEnd: "18:00" },
+            { name: "고소미", defStart: "09:00", defEnd: "18:00" },
+            { name: "김지혜", defStart: "09:00", defEnd: "18:00" },
+            { name: "신동현", defStart: "09:00", defEnd: "18:00" },
+            { name: "장지웅", defStart: "09:00", defEnd: "18:00" },
+            { name: "최윤서", defStart: "09:00", defEnd: "18:00" }
+        ];
+        
+        // 데이터 상태 (Firebase와 동기화됨)
+        window.members = [];
+        window.records = {};
+        window.isAdmin = false;
+
+        const MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
+        // 출근 08~15, 퇴근 12~21
+        const START_HOURS = []; for(let i=8; i<=15; i++) START_HOURS.push(String(i).padStart(2,'0'));
+        const END_HOURS = []; for(let i=12; i<=21; i++) END_HOURS.push(String(i).padStart(2,'0'));
+
+        // === 3. Firebase 실시간 리스너 연결 ===
+        // 앱 시작 시 실행
+        async function initApp() {
+            // A. 멤버 데이터 리스너
+            onSnapshot(doc(db, "dshare", "members"), (docSnap) => {
+                if (docSnap.exists()) {
+                    window.members = docSnap.data().list;
+                } else {
+                    // 데이터 없으면 초기값 세팅
+                    window.members = JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
+                    setDoc(doc(db, "dshare", "members"), { list: window.members });
+                }
+                renderAll(); // 데이터 바뀌면 화면 다시 그리기
+            });
+
+            // B. 기록 데이터 리스너
+            onSnapshot(doc(db, "dshare", "records"), (docSnap) => {
+                document.getElementById('loading').style.display = 'none'; // 로딩 끝
+                if (docSnap.exists()) {
+                    window.records = docSnap.data().data;
+                } else {
+                    window.records = {};
+                    setDoc(doc(db, "dshare", "records"), { data: {} });
+                }
+                renderAll();
+            });
+        }
+        initApp(); // 실행
+
+        // === 4. 화면 렌더링 함수들 ===
+        function renderAll() {
+            renderWeekView();
+            renderMonthView();
+            if(window.isAdmin) renderAdminMembers();
+        }
+
+        // Firebase에 데이터 저장하는 함수 (LocalStorage 대체)
+        async function saveRecordsToDB() {
+            try {
+                await setDoc(doc(db, "dshare", "records"), { data: window.records }, { merge: true });
+                showToast();
+            } catch(e) { console.error("Error adding document: ", e); }
+        }
+
+        async function saveMembersToDB() {
+            try {
+                await setDoc(doc(db, "dshare", "members"), { list: window.members });
+                showToast();
+            } catch(e) { console.error("Error adding document: ", e); }
+        }
+
+        // ------------------------------------------
+        // 기존 UI 로직 (window. 함수로 변환하여 모듈 밖에서 호출 가능하게 함)
+        // ------------------------------------------
+
+        window.switchTab = function(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            event.target.classList.add('active');
+            renderAll();
+        }
+
+        // === 시간 선택기 생성 ===
+        window.createTimeSelectHTML = function(idPrefix, timeValue, onChangeFuncStr, type) {
+            let [h, m] = timeValue ? timeValue.split(':') : ["09", "00"];
+            let hoursArr = (type === 'start') ? START_HOURS : END_HOURS;
+            if(!hoursArr.includes(h)) hoursArr = [...hoursArr, h].sort(); // 범위 밖 값 처리
+
+            let hOptions = hoursArr.map(val => `<option value="${val}" ${val==h?'selected':''}>${val}</option>`).join('');
+            let mOptions = MINUTES.map(val => `<option value="${val}" ${val==m?'selected':''}>${val}</option>`).join('');
+
+            return `
+                <div class="time-select-group" id="${idPrefix}_group">
+                    <select id="${idPrefix}_h" class="time-select" onchange="${onChangeFuncStr}">${hOptions}</select>
+                    <span class="time-separator">:</span>
+                    <select id="${idPrefix}_m" class="time-select" onchange="${onChangeFuncStr}">${mOptions}</select>
+                </div>`;
+        }
+
+        window.getTimeFromSelects = function(idPrefix) {
+            const h = document.getElementById(`${idPrefix}_h`).value;
+            const m = document.getElementById(`${idPrefix}_m`).value;
+            return `${h}:${m}`;
+        }
+
+        window.setTimeSelects = function(idPrefix, timeStr) {
+            let [h, m] = timeStr.split(':');
+            let mNum = Math.round(Number(m)/5)*5;
+            if(mNum===60) { mNum=0; h=Number(h)+1; }
+            m = String(mNum).padStart(2,'0');
+            h = String(h).padStart(2,'0');
+
+            const hEl = document.getElementById(`${idPrefix}_h`);
+            const mEl = document.getElementById(`${idPrefix}_m`);
+            if(hEl && mEl) {
+                // 옵션 없으면 추가
+                if(!Array.from(hEl.options).some(op=>op.value==h)) hEl.add(new Option(h,h));
+                hEl.value = h; mEl.value = m;
+            }
+        }
+
+        // === 주간 보기 ===
+        function renderWeekView() {
+            const tbody = document.getElementById('weekBody');
+            const thead = document.getElementById('weekHeader');
+            tbody.innerHTML = "";
+            
+            const monday = getMonday(currentViewDate);
+            const weekDates = [];
+            const dayNames = ['월', '화', '수', '목', '금'];
+            
+            thead.innerHTML = '<th class="name-col">이름</th>';
+            for(let i=0; i<5; i++) {
+                let d = new Date(monday);
+                d.setDate(monday.getDate() + i);
+                let dateStr = d.toISOString().split('T')[0];
+                weekDates.push({ date: d, key: dateStr });
+                let th = document.createElement('th');
+                th.innerHTML = `${d.getMonth()+1}/${d.getDate()} (${dayNames[i]})`;
+                if(dateStr === new Date().toISOString().split('T')[0]) th.classList.add('today-header');
+                thead.appendChild(th);
+            }
+            document.getElementById('weekTitle').innerText = `${monday.getMonth()+1}월 ${getWeekNumber(monday)}주차 입력`;
+
+            window.members.forEach(mObj => {
+                let tr = document.createElement('tr');
+                tr.innerHTML = `<td class="name-col">${mObj.name}</td>`;
+                weekDates.forEach(day => {
+                    let td = document.createElement('td');
+                    let data = (window.records[day.key] && window.records[day.key][mObj.name]) || { type: 'work', start: mObj.defStart, end: mObj.defEnd };
+                    let idBase = `cell_${day.key}_${mObj.name}`;
+
+                    let typeHtml = `
+                        <select id="${idBase}_type" onchange="handleTypeChange('${day.key}', '${mObj.name}', this.value)" style="width:100%; margin-bottom:4px;">
+                            <option value="work" ${data.type==='work'?'selected':''}>🔵 정상</option>
+                            <option value="half_am" ${data.type==='half_am'?'selected':''}>🟡 오전반</option>
+                            <option value="half_pm" ${data.type==='half_pm'?'selected':''}>🟠 오후반</option>
+                            <option value="q_am" ${data.type==='q_am'?'selected':''}>🌓 오전반반</option>
+                            <option value="q_pm" ${data.type==='q_pm'?'selected':''}>🌗 오후반반</option>
+                            <option value="vacation" ${data.type==='vacation'?'selected':''}>🔴 연차</option>
+                        </select>`;
+                    
+                    let startHtml = createTimeSelectHTML(`${idBase}_start`, data.start, `handleTimeChange('${day.key}', '${mObj.name}', 'start')`, 'start');
+                    let endHtml = createTimeSelectHTML(`${idBase}_end`, data.end, `handleTimeChange('${day.key}', '${mObj.name}', 'end')`, 'end');
+
+                    td.innerHTML = `${typeHtml} <div id="${idBase}_time_box" style="display:${data.type==='vacation'?'none':'block'}">${startHtml} ${endHtml}</div>`;
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        window.handleTypeChange = function(dateKey, name, typeVal) {
+            updateRecord(dateKey, name, 'type', typeVal);
+            document.getElementById(`cell_${dateKey}_${name}_time_box`).style.display = (typeVal==='vacation') ? 'none' : 'block';
+            saveRecordsToDB(); // DB 저장
+        }
+
+        window.handleTimeChange = function(dateKey, name, which) {
+            let idBase = `cell_${dateKey}_${name}`;
+            let val = getTimeFromSelects(`${idBase}_${which}`);
+            if(which === 'start') { // 자동 퇴근 계산
+                let [h, m] = val.split(':').map(Number);
+                let endH = (h + 9) % 24;
+                let endStr = `${String(endH).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+                setTimeSelects(`${idBase}_end`, endStr);
+                updateRecord(dateKey, name, 'end', endStr);
+            }
+            updateRecord(dateKey, name, which, val);
+            saveRecordsToDB(); // DB 저장
+        }
+
+        function updateRecord(date, name, field, val) {
+            if(!window.records[date]) window.records[date] = {};
+            if(!window.records[date][name]) {
+                const m = window.members.find(x => x.name === name) || { defStart: "09:00", defEnd: "18:00" };
+                window.records[date][name] = { type: 'work', start: m.defStart, end: m.defEnd };
+            }
+            window.records[date][name][field] = val;
+        }
+
+        // === 월간 보기 ===
+        function renderMonthView() {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = "";
+            const year = currentViewDate.getFullYear();
+            const month = currentViewDate.getMonth();
+            document.getElementById('monthTitle').innerText = `${year}년 ${month+1}월`;
+
+            const lastDay = new Date(year, month+1, 0).getDate();
+            const firstDayObj = new Date(year, month, 1);
+            let firstDayOfWeek = firstDayObj.getDay(); 
+            let padding = (firstDayOfWeek >= 1 && firstDayOfWeek <= 5) ? firstDayOfWeek - 1 : 0;
+            
+            for(let i=0; i<padding; i++) grid.innerHTML += `<div></div>`;
+
+            for(let d=1; d<=lastDay; d++) {
+                let dateObj = new Date(year, month, d);
+                let dayOfWeek = dateObj.getDay();
+                if(dayOfWeek === 0 || dayOfWeek === 6) continue;
+
+                let dateKey = dateObj.toISOString().split('T')[0];
+                let html = `<div class="cal-cell ${dateKey===new Date().toISOString().split('T')[0]?'cal-today':''}">
+                    <span style="font-weight:bold; color:#555;">${d}일</span>
+                    <div style="flex-grow:1; overflow-y:auto; display:flex; flex-direction:column; gap:4px;">`;
+
+                window.members.forEach(m => {
+                    let hasRecord = window.records[dateKey] && window.records[dateKey][m.name];
+                    let r = hasRecord ? window.records[dateKey][m.name] : { type: 'work', start: m.defStart, end: m.defEnd };
+                    let isVac = r.type==='vacation';
+                    let timeTxt = isVac ? '연차' : `${r.start}~${r.end}`;
+                    let styleClass = hasRecord ? (isVac?'tag-vacation':'') : 'default-val';
+                    
+                    html += `<div class="cal-member-tag ${styleClass}" onclick="openModal('${dateKey}', '${m.name}')">
+                        <span style="font-weight:600">${m.name}</span><span>${timeTxt}</span></div>`;
+                });
+                html += `</div></div>`;
+                grid.innerHTML += html;
+            }
+        }
+
+        // === 모달 ===
+        window.openModal = function(dateKey, name) {
+            let mObj = window.members.find(m => m.name === name);
+            let data = (window.records[dateKey] && window.records[dateKey][name]) || { type: 'work', start: mObj.defStart, end: mObj.defEnd };
+            
+            document.getElementById('modalDateKey').value = dateKey;
+            document.getElementById('modalMember').value = name;
+            document.getElementById('modalInfoText').innerText = `${dateKey} / ${name}`;
+            document.getElementById('modalType').value = data.type;
+            
+            let timeBox = document.getElementById('modalTimePickers');
+            timeBox.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px; justify-content:center;">
+                    ${createTimeSelectHTML('modal_start', data.start, "calcModalEnd()", 'start')}
+                    <span>~</span>
+                    ${createTimeSelectHTML('modal_end', data.end, "", 'end')}
+                </div>`;
+            
+            toggleModalTimeInputs();
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        window.closeModal = function(e) { 
+            if(e && e.target !== e.currentTarget) return;
+            document.getElementById('editModal').classList.remove('active'); 
+        }
+
+        window.toggleModalTimeInputs = function() {
+            let type = document.getElementById('modalType').value;
+            document.getElementById('modalTimeGroup').style.display = (type==='vacation'?'none':'block');
+        }
+
+        window.calcModalEnd = function() {
+            let startVal = getTimeFromSelects('modal_start');
+            let [h, m] = startVal.split(':').map(Number);
+            let endH = (h + 9) % 24;
+            let endStr = `${String(endH).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+            setTimeSelects('modal_end', endStr);
+        }
+
+        window.saveModalData = function() {
+            let date = document.getElementById('modalDateKey').value;
+            let name = document.getElementById('modalMember').value;
+            let type = document.getElementById('modalType').value;
+            let start = getTimeFromSelects('modal_start');
+            let end = getTimeFromSelects('modal_end');
+            
+            updateRecord(date, name, 'type', type);
+            updateRecord(date, name, 'start', start);
+            updateRecord(date, name, 'end', end);
+            saveRecordsToDB(); // DB 저장
+            closeModal();
+        }
+
+        // === 관리자 ===
+        window.adminLogin = function() {
+            if(prompt("ID")==='dshare' && prompt("PW")==='Dshare123!') {
+                window.isAdmin=true; 
+                document.getElementById('adminLogin').classList.add('hidden');
+                document.getElementById('adminPanel').classList.remove('hidden');
+                renderAdminMembers();
+            } else alert("실패");
+        }
+
+        window.renderAdminMembers = function() {
+            const area = document.getElementById('memberListArea');
+            area.innerHTML = window.members.map((m, i) => `
+                <div class="admin-list-item">
+                    <span style="font-weight:bold; min-width:60px;">${m.name}</span>
+                    <div style="display:flex; gap:5px; align-items:center;">
+                        <span style="font-size:12px;">기본:</span>
+                        ${createTimeSelectHTML(`admin_def_start_${i}`, m.defStart, `updateDef(${i}, 'defStart')`, 'start')}
+                        ~
+                        ${createTimeSelectHTML(`admin_def_end_${i}`, m.defEnd, `updateDef(${i}, 'defEnd')`, 'end')}
+                    </div>
+                    <div>
+                        <button class="btn btn-icon" onclick="moveMember(${i},-1)">▲</button>
+                        <button class="btn btn-icon" onclick="moveMember(${i},1)">▼</button>
+                        <button class="btn btn-danger" style="padding:5px 10px; font-size:12px;" onclick="delMember(${i})">삭제</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        window.updateDef = function(idx, field) {
+            let idPrefix = (field === 'defStart') ? `admin_def_start_${idx}` : `admin_def_end_${idx}`;
+            window.members[idx][field] = getTimeFromSelects(idPrefix);
+            saveMembersToDB(); // 멤버 DB 저장
+        };
+
+        window.addMember = function() {
+            let n = document.getElementById('newMemberName').value.trim();
+            if(n && !window.members.some(m=>m.name===n)) {
+                window.members.push({name:n, defStart:"09:00", defEnd:"18:00"});
+                document.getElementById('newMemberName').value="";
+                saveMembersToDB(); 
+            }
+        }
+        window.delMember = function(i) { if(confirm("삭제?")) { window.members.splice(i,1); saveMembersToDB(); } }
+        window.moveMember = function(i, dir) {
+            if(i+dir<0 || i+dir>=window.members.length) return;
+            [window.members[i], window.members[i+dir]] = [window.members[i+dir], window.members[i]];
+            saveMembersToDB();
+        }
+
+        // === Utils ===
+        function showToast() {
+            let t = document.getElementById("toast");
+            t.className = "show";
+            setTimeout(()=> t.className=t.className.replace("show",""), 2000);
+        }
+        function getMonday(d) { d=new Date(d); let day=d.getDay(), diff=d.getDate()-day+(day==0?-6:1); return new Date(d.setDate(diff)); }
+        function getWeekNumber(d) { let onejan=new Date(d.getFullYear(),0,1); return Math.ceil((((d-onejan)/86400000)+onejan.getDay()+1)/7); }
+        window.moveWeek = function(n) { currentViewDate.setDate(currentViewDate.getDate()+n*7); renderWeekView(); }
+        window.moveMonth = function(n) { currentViewDate.setMonth(currentViewDate.getMonth()+n); renderMonthView(); }
+    </script>
+</body>
+</html>
