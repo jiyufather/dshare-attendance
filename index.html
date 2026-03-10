@@ -23,14 +23,14 @@
         .tab-btn { padding: 14px 28px; border: none; border-radius: 12px; background: #e9ecef; font-weight: 600; cursor: pointer; color: #7f8c8d; transition: 0.3s; font-size: 16px; }
         .tab-btn:hover { background: #dfe4ea; }
         .tab-btn.active { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-2px); }
-        
+
         .tab-content { display: none; animation: fadeIn 0.4s ease; }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .card { background: var(--white); border-radius: 16px; padding: 25px; box-shadow: var(--shadow-sm); margin-bottom: 25px; border: 1px solid white; }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        
+
         .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; font-family: 'Pretendard'; }
         .btn-secondary { background: #f1f3f5; color: #495057; }
         .btn-primary { background: var(--primary); color: white; }
@@ -64,7 +64,7 @@
         .modal-overlay.active { display: flex; }
         .modal-content { background: white; padding: 30px; border-radius: 16px; width: 90%; max-width: 400px; position: relative; }
         .modal-close { position: absolute; top: 15px; right: 20px; font-size: 24px; cursor: pointer; color: #999; }
-        
+
         #toast { visibility: hidden; min-width: 250px; margin-left: -125px; background-color: #333; color: #fff; text-align: center; border-radius: 25px; padding: 16px; position: fixed; z-index: 9999; left: 50%; bottom: 30px; font-size: 14px; }
         #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
         @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
@@ -82,9 +82,9 @@
     <h1>📅 D.Share 사업기획팀 근태관리</h1>
 
     <div class="tab-nav">
-        <button class="tab-btn active" onclick="switchTab('week')">주간 보기 (입력)</button>
-        <button class="tab-btn" onclick="switchTab('month')">월간 보기 (캘린더)</button>
-        <button class="tab-btn" onclick="switchTab('admin')">⚙️ 관리자</button>
+        <button class="tab-btn active" onclick="switchTab('week', this)">주간 보기 (입력)</button>
+        <button class="tab-btn" onclick="switchTab('month', this)">월간 보기 (캘린더)</button>
+        <button class="tab-btn" onclick="switchTab('admin', this)">⚙️ 관리자</button>
     </div>
 
     <div id="tab-week" class="tab-content active">
@@ -186,11 +186,15 @@
         const db = getFirestore(app);
 
         let currentViewDate = new Date();
-        window.members = []; window.records = {}; window.isAdmin = false;
+        window.members = [];
+        window.records = {};
+        window.isAdmin = false;
 
         const MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
-        const START_HOURS = []; for(let i=8; i<=15; i++) START_HOURS.push(String(i).padStart(2,'0'));
-        const END_HOURS = []; for(let i=12; i<=21; i++) END_HOURS.push(String(i).padStart(2,'0'));
+        const START_HOURS = [];
+        for(let i=8; i<=15; i++) START_HOURS.push(String(i).padStart(2,'0'));
+        const END_HOURS = [];
+        for(let i=12; i<=21; i++) END_HOURS.push(String(i).padStart(2,'0'));
 
         function getLocalKey(dateObj) {
             const year = dateObj.getFullYear();
@@ -199,17 +203,29 @@
             return `${year}-${month}-${day}`;
         }
 
-        // === [연동] 구글 캘린더 동기화 ===
         async function syncToGoogleCalendar(name, date, typeKey) {
-            const typeMap = { 'vacation': '🔴 연차', 'half_am': '🟡 오전반차', 'half_pm': '🟠 오후반차' };
-            const displayType = typeMap[typeKey];
-            if (!displayType) return; 
+            const typeMap = {
+                'vacation': '🔴 연차',
+                'half_am': '🟡 오전반차',
+                'half_pm': '🟠 오후반차',
+                'q_am': '🌓 오전반반차',
+                'q_pm': '🌗 오후반반차'
+            };
 
-            const gasUrl = "https://script.google.com/macros/s/AKfycbw4NgFhQBtpdvRKUtLic9DSrnejdEOe56bWzr2wJmJMcDQh1TQmD0o3iCp_OU3H1PHZ/exec"; 
+            const displayType = typeMap[typeKey];
+            if (!displayType) return;
+
+            const gasUrl = "https://script.google.com/macros/s/AKfycbw4NgFhQBtpdvRKUtLic9DSrnejdEOe56bWzr2wJmJMcDQh1TQmD0o3iCp_OU3H1PHZ/exec";
             try {
-                await fetch(gasUrl, { method: 'POST', body: JSON.stringify({ name: name, date: date, type: displayType }), mode: 'no-cors' });
+                await fetch(gasUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ name: name, date: date, type: displayType }),
+                    mode: 'no-cors'
+                });
                 console.log("팀 캘린더 동기화 완료");
-            } catch (e) { console.error("동기화 실패:", e); }
+            } catch (e) {
+                console.error("동기화 실패:", e);
+            }
         }
 
         async function initApp() {
@@ -217,6 +233,7 @@
                 if (docSnap.exists()) window.members = docSnap.data().list;
                 renderAll();
             });
+
             onSnapshot(doc(db, "dshare", "records"), (docSnap) => {
                 document.getElementById('loading').style.display = 'none';
                 if (docSnap.exists()) window.records = docSnap.data().data;
@@ -225,79 +242,149 @@
         }
         initApp();
 
-        function renderAll() { renderWeekView(); renderMonthView(); if(window.isAdmin) renderAdminMembers(); }
+        function renderAll() {
+            renderWeekView();
+            renderMonthView();
+            if(window.isAdmin) renderAdminMembers();
+        }
 
         async function saveRecordsToDB() {
-            try { await setDoc(doc(db, "dshare", "records"), { data: window.records }, { merge: true }); showToast(); } catch(e) { console.error(e); }
+            try {
+                await setDoc(doc(db, "dshare", "records"), { data: window.records }, { merge: true });
+                showToast();
+            } catch(e) {
+                console.error(e);
+            }
         }
+
         async function saveMembersToDB() {
-            try { await setDoc(doc(db, "dshare", "members"), { list: window.members }); showToast(); } catch(e) { console.error(e); }
+            try {
+                await setDoc(doc(db, "dshare", "members"), { list: window.members });
+                showToast();
+            } catch(e) {
+                console.error(e);
+            }
         }
 
         window.handleTypeChange = async function(dateKey, name, typeVal) {
             updateRecord(dateKey, name, 'type', typeVal);
             const timeBox = document.getElementById(`cell_${dateKey}_${name}_time_box`);
-            if(timeBox) timeBox.style.display = (typeVal==='vacation') ? 'none' : 'block';
+            if(timeBox) timeBox.style.display = (typeVal === 'vacation') ? 'none' : 'block';
             await saveRecordsToDB();
-            syncToGoogleCalendar(name, dateKey, typeVal); 
-        }
+            syncToGoogleCalendar(name, dateKey, typeVal);
+        };
 
         window.saveModalData = async function() {
             let date = document.getElementById('modalDateKey').value;
             let name = document.getElementById('modalMember').value;
             let type = document.getElementById('modalType').value;
+
             updateRecord(date, name, 'type', type);
             updateRecord(date, name, 'start', getTimeFromSelects('modal_start'));
             updateRecord(date, name, 'end', getTimeFromSelects('modal_end'));
-            await saveRecordsToDB();
-            syncToGoogleCalendar(name, date, type); 
-            closeModal();
-        }
 
-        // --- UI 유틸 함수들 ---
-        window.switchTab = function(tabName) {
+            await saveRecordsToDB();
+            syncToGoogleCalendar(name, date, type);
+            closeModal();
+        };
+
+        window.switchTab = function(tabName, btnEl) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             document.getElementById(`tab-${tabName}`).classList.add('active');
-            event.target.classList.add('active');
+            if (btnEl) btnEl.classList.add('active');
             renderAll();
-        }
+        };
+
         window.createTimeSelectHTML = function(idPrefix, timeValue, onChangeFuncStr, type) {
             let [h, m] = timeValue ? timeValue.split(':') : ["09", "00"];
             let hoursArr = (type === 'start') ? START_HOURS : END_HOURS;
             let hOptions = hoursArr.map(val => `<option value="${val}" ${val==h?'selected':''}>${val}</option>`).join('');
             let mOptions = MINUTES.map(val => `<option value="${val}" ${val==m?'selected':''}>${val}</option>`).join('');
             return `<div class="time-select-group"><select id="${idPrefix}_h" class="time-select" onchange="${onChangeFuncStr}">${hOptions}</select><span>:</span><select id="${idPrefix}_m" class="time-select" onchange="${onChangeFuncStr}">${mOptions}</select></div>`;
-        }
-        window.getTimeFromSelects = function(idPrefix) { return `${document.getElementById(`${idPrefix}_h`).value}:${document.getElementById(`${idPrefix}_m`).value}`; }
+        };
+
+        window.getTimeFromSelects = function(idPrefix) {
+            return `${document.getElementById(`${idPrefix}_h`).value}:${document.getElementById(`${idPrefix}_m`).value}`;
+        };
+
         window.setTimeSelects = function(idPrefix, timeStr) {
             let [h, m] = timeStr.split(':');
-            const hEl = document.getElementById(`${idPrefix}_h`); const mEl = document.getElementById(`${idPrefix}_m`);
-            if(hEl && mEl) { hEl.value = h.padStart(2,'0'); mEl.value = m.padStart(2,'0'); }
+            const hEl = document.getElementById(`${idPrefix}_h`);
+            const mEl = document.getElementById(`${idPrefix}_m`);
+            if(hEl && mEl) {
+                hEl.value = h.padStart(2,'0');
+                mEl.value = m.padStart(2,'0');
+            }
+        };
+
+        function getTypeLabel(r) {
+            if (r.type === 'vacation') return '연차';
+            if (r.type === 'half_am') return '오전반차';
+            if (r.type === 'half_pm') return '오후반차';
+            if (r.type === 'q_am') return '오전반반차';
+            if (r.type === 'q_pm') return '오후반반차';
+            return r.start;
         }
 
         function renderWeekView() {
-            const tbody = document.getElementById('weekBody'); const thead = document.getElementById('weekHeader');
-            tbody.innerHTML = ""; const monday = getMonday(currentViewDate); const todayKey = getLocalKey(new Date());
+            const tbody = document.getElementById('weekBody');
+            const thead = document.getElementById('weekHeader');
+            tbody.innerHTML = "";
+
+            const monday = getMonday(currentViewDate);
+            const todayKey = getLocalKey(new Date());
+
             thead.innerHTML = '<th class="name-col">이름</th>';
+
             for(let i=0; i<5; i++) {
-                let d = new Date(monday); d.setDate(monday.getDate() + i); let dateStr = getLocalKey(d);
-                let th = document.createElement('th'); th.innerHTML = `${d.getMonth()+1}/${d.getDate()}`;
+                let d = new Date(monday);
+                d.setDate(monday.getDate() + i);
+                let dateStr = getLocalKey(d);
+                let th = document.createElement('th');
+                th.innerHTML = `${d.getMonth()+1}/${d.getDate()}`;
                 if(dateStr === todayKey) th.classList.add('today-header');
                 thead.appendChild(th);
             }
+
             document.getElementById('weekTitle').innerText = `${monday.getMonth()+1}월 ${getWeekNumber(monday)}주차 입력`;
+
             window.members.forEach(mObj => {
-                let tr = document.createElement('tr'); tr.innerHTML = `<td class="name-col">${mObj.name}</td>`;
+                let tr = document.createElement('tr');
+                tr.innerHTML = `<td class="name-col">${mObj.name}</td>`;
+
                 for(let i=0; i<5; i++) {
-                    let d = new Date(monday); d.setDate(monday.getDate() + i); let dateKey = getLocalKey(d);
-                    let data = (window.records[dateKey] && window.records[dateKey][mObj.name]) || { type: 'work', start: mObj.defStart, end: mObj.defEnd };
+                    let d = new Date(monday);
+                    d.setDate(monday.getDate() + i);
+                    let dateKey = getLocalKey(d);
+
+                    let data = (window.records[dateKey] && window.records[dateKey][mObj.name]) || {
+                        type: 'work',
+                        start: mObj.defStart,
+                        end: mObj.defEnd
+                    };
+
                     let idBase = `cell_${dateKey}_${mObj.name}`;
                     let td = document.createElement('td');
-                    td.innerHTML = `<select id="${idBase}_type" onchange="handleTypeChange('${dateKey}', '${mObj.name}', this.value)" style="width:100%;"><option value="work" ${data.type==='work'?'selected':''}>🔵 정상</option><option value="half_am" ${data.type==='half_am'?'selected':''}>🟡 오전반차</option><option value="half_pm" ${data.type==='half_pm'?'selected':''}>🟠 오후반차</option><option value="vacation" ${data.type==='vacation'?'selected':''}>🔴 연차</option></select>
-                        <div id="${idBase}_time_box" style="display:${data.type==='vacation'?'none':'block'}">${createTimeSelectHTML(`${idBase}_start`, data.start, `handleTimeChange('${dateKey}', '${mObj.name}', 'start')`, 'start')}${createTimeSelectHTML(`${idBase}_end`, data.end, `handleTimeChange('${dateKey}', '${mObj.name}', 'end')`, 'end')}</div>`;
+
+                    td.innerHTML = `
+                        <select id="${idBase}_type" onchange="handleTypeChange('${dateKey}', '${mObj.name}', this.value)" style="width:100%;">
+                            <option value="work" ${data.type==='work'?'selected':''}>🔵 정상출근</option>
+                            <option value="half_am" ${data.type==='half_am'?'selected':''}>🟡 오전반차</option>
+                            <option value="half_pm" ${data.type==='half_pm'?'selected':''}>🟠 오후반차</option>
+                            <option value="q_am" ${data.type==='q_am'?'selected':''}>🌓 오전반반차</option>
+                            <option value="q_pm" ${data.type==='q_pm'?'selected':''}>🌗 오후반반차</option>
+                            <option value="vacation" ${data.type==='vacation'?'selected':''}>🔴 연차</option>
+                        </select>
+                        <div id="${idBase}_time_box" style="display:${data.type==='vacation'?'none':'block'}">
+                            ${createTimeSelectHTML(`${idBase}_start`, data.start, `handleTimeChange('${dateKey}', '${mObj.name}', 'start')`, 'start')}
+                            ${createTimeSelectHTML(`${idBase}_end`, data.end, `handleTimeChange('${dateKey}', '${mObj.name}', 'end')`, 'end')}
+                        </div>
+                    `;
+
                     tr.appendChild(td);
                 }
+
                 tbody.appendChild(tr);
             });
         }
@@ -305,7 +392,8 @@
         window.handleTimeChange = function(dateKey, name, which) {
             updateRecord(dateKey, name, which, getTimeFromSelects(`cell_${dateKey}_${name}_${which}`));
             saveRecordsToDB();
-        }
+        };
+
         function updateRecord(date, name, field, val) {
             if(!window.records[date]) window.records[date] = {};
             if(!window.records[date][name]) {
@@ -316,46 +404,90 @@
         }
 
         function renderMonthView() {
-            const grid = document.getElementById('calendarGrid'); grid.innerHTML = "";
-            const year = currentViewDate.getFullYear(); const month = currentViewDate.getMonth();
-            const lastDay = new Date(year, month+1, 0).getDate();
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = "";
+
+            const year = currentViewDate.getFullYear();
+            const month = currentViewDate.getMonth();
+            const lastDay = new Date(year, month + 1, 0).getDate();
             const firstDayOfWeek = new Date(year, month, 1).getDay();
             let padding = (firstDayOfWeek >= 1 && firstDayOfWeek <= 5) ? firstDayOfWeek - 1 : 0;
+
             for(let i=0; i<padding; i++) grid.innerHTML += `<div></div>`;
+
+            const todayKey = getLocalKey(new Date());
+
             for(let d=1; d<=lastDay; d++) {
-                let dateObj = new Date(year, month, d); if(dateObj.getDay() === 0 || dateObj.getDay() === 6) continue;
-                let dateKey = getLocalKey(dateObj); let html = `<div class="cal-cell"><span style="font-weight:bold;">${d}</span>`;
+                let dateObj = new Date(year, month, d);
+                if(dateObj.getDay() === 0 || dateObj.getDay() === 6) continue;
+
+                let dateKey = getLocalKey(dateObj);
+                let todayClass = dateKey === todayKey ? ' cal-today' : '';
+                let html = `<div class="cal-cell${todayClass}"><span style="font-weight:bold;">${d}</span>`;
+
                 window.members.forEach(m => {
-                    let r = (window.records[dateKey] && window.records[dateKey][m.name]) || { type: 'work', start: m.defStart, end: m.defEnd };
-                    html += `<div class="cal-member-tag ${r.type==='vacation'?'tag-vacation':''}" onclick="openModal('${dateKey}', '${m.name}')"><span>${m.name}</span><span>${r.type==='vacation'?'연차':r.start}</span></div>`;
+                    let r = (window.records[dateKey] && window.records[dateKey][m.name]) || {
+                        type: 'work',
+                        start: m.defStart,
+                        end: m.defEnd
+                    };
+
+                    html += `
+                        <div class="cal-member-tag ${r.type==='vacation'?'tag-vacation':''}" onclick="openModal('${dateKey}', '${m.name}')">
+                            <span>${m.name}</span>
+                            <span>${getTypeLabel(r)}</span>
+                        </div>
+                    `;
                 });
+
                 grid.innerHTML += html + `</div>`;
             }
         }
 
         window.openModal = function(dateKey, name) {
             let mObj = window.members.find(m => m.name === name);
-            let data = (window.records[dateKey] && window.records[dateKey][name]) || { type: 'work', start: mObj.defStart, end: mObj.defEnd };
-            document.getElementById('modalDateKey').value = dateKey; document.getElementById('modalMember').value = name;
+            let data = (window.records[dateKey] && window.records[dateKey][name]) || {
+                type: 'work',
+                start: mObj.defStart,
+                end: mObj.defEnd
+            };
+
+            document.getElementById('modalDateKey').value = dateKey;
+            document.getElementById('modalMember').value = name;
             document.getElementById('modalInfoText').innerText = `${dateKey} / ${name}`;
             document.getElementById('modalType').value = data.type;
-            document.getElementById('modalTimePickers').innerHTML = `${createTimeSelectHTML('modal_start', data.start, "calcModalEnd()", 'start')} ~ ${createTimeSelectHTML('modal_end', data.end, "", 'end')}`;
-            toggleModalTimeInputs(); document.getElementById('editModal').classList.add('active');
-        }
-        window.closeModal = function(e) { if(e && e.target !== e.currentTarget) return; document.getElementById('editModal').classList.remove('active'); }
-        window.toggleModalTimeInputs = function() { document.getElementById('modalTimeGroup').style.display = (document.getElementById('modalType').value==='vacation'?'none':'block'); }
+            document.getElementById('modalTimePickers').innerHTML =
+                `${createTimeSelectHTML('modal_start', data.start, "calcModalEnd()", 'start')} ~ ${createTimeSelectHTML('modal_end', data.end, "", 'end')}`;
+            toggleModalTimeInputs();
+            document.getElementById('editModal').classList.add('active');
+        };
+
+        window.closeModal = function(e) {
+            if(e && e.target !== e.currentTarget) return;
+            document.getElementById('editModal').classList.remove('active');
+        };
+
+        window.toggleModalTimeInputs = function() {
+            document.getElementById('modalTimeGroup').style.display =
+                (document.getElementById('modalType').value === 'vacation' ? 'none' : 'block');
+        };
+
         window.calcModalEnd = function() {
             let [h, m] = getTimeFromSelects('modal_start').split(':').map(Number);
             setTimeSelects('modal_end', `${String((h + 9) % 24).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
-        }
+        };
 
-        // --- 원본 관리자 UI 로직 ---
         window.adminLogin = function() {
-            if(prompt("ID")==='dshare' && prompt("PW")==='Dshare123!') {
-                window.isAdmin=true; document.getElementById('adminLogin').classList.add('hidden');
-                document.getElementById('adminPanel').classList.remove('hidden'); renderAdminMembers();
-            } else alert("실패");
-        }
+            if(prompt("ID") === 'dshare' && prompt("PW") === 'Dshare123!') {
+                window.isAdmin = true;
+                document.getElementById('adminLogin').classList.add('hidden');
+                document.getElementById('adminPanel').classList.remove('hidden');
+                renderAdminMembers();
+            } else {
+                alert("실패");
+            }
+        };
+
         window.renderAdminMembers = function() {
             const area = document.getElementById('memberListArea');
             area.innerHTML = window.members.map((m, i) => `
@@ -372,24 +504,65 @@
                         <button class="btn btn-icon" onclick="moveMember(${i},1)">▼</button>
                         <button class="btn btn-danger" style="padding:5px 10px; font-size:12px;" onclick="delMember(${i})">삭제</button>
                     </div>
-                </div>`).join('');
-        }
-        window.updateDef = function(idx, field) { window.members[idx][field] = getTimeFromSelects((field === 'defStart') ? `admin_def_start_${idx}` : `admin_def_end_${idx}`); saveMembersToDB(); };
+                </div>
+            `).join('');
+        };
+
+        window.updateDef = function(idx, field) {
+            window.members[idx][field] = getTimeFromSelects((field === 'defStart') ? `admin_def_start_${idx}` : `admin_def_end_${idx}`);
+            saveMembersToDB();
+        };
+
         window.addMember = function() {
             let n = document.getElementById('newMemberName').value.trim();
-            if(n && !window.members.some(m=>m.name===n)) { window.members.push({name:n, defStart:"09:00", defEnd:"18:00"}); saveMembersToDB(); }
-        }
-        window.delMember = function(i) { if(confirm("삭제?")) { window.members.splice(i,1); saveMembersToDB(); } }
+            if(n && !window.members.some(m => m.name === n)) {
+                window.members.push({name:n, defStart:"09:00", defEnd:"18:00"});
+                saveMembersToDB();
+            }
+        };
+
+        window.delMember = function(i) {
+            if(confirm("삭제?")) {
+                window.members.splice(i, 1);
+                saveMembersToDB();
+            }
+        };
+
         window.moveMember = function(i, dir) {
-            if(i+dir<0 || i+dir>=window.members.length) return;
-            [window.members[i], window.members[i+dir]] = [window.members[i+dir], window.members[i]]; saveMembersToDB();
+            if(i + dir < 0 || i + dir >= window.members.length) return;
+            [window.members[i], window.members[i + dir]] = [window.members[i + dir], window.members[i]];
+            saveMembersToDB();
+        };
+
+        function showToast() {
+            let t = document.getElementById("toast");
+            t.className = "show";
+            setTimeout(() => t.className = "", 2000);
         }
 
-        function showToast() { let t = document.getElementById("toast"); t.className = "show"; setTimeout(()=> t.className="", 2000); }
-        function getMonday(d) { d=new Date(d); let day=d.getDay(), diff=d.getDate()-day+(day==0?-6:1); return new Date(d.setDate(diff)); }
-        function getWeekNumber(date) { return Math.ceil((date.getDate() + new Date(date.getFullYear(), date.getMonth(), 1).getDay()) / 7); }
-        window.moveWeek = function(n) { currentViewDate.setDate(currentViewDate.getDate()+n*7); renderWeekView(); }
-        window.moveMonth = function(n) { currentViewDate.setMonth(currentViewDate.getMonth()+n); renderMonthView(); }
+        function getMonday(d) {
+            d = new Date(d);
+            let day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6 : 1);
+            return new Date(d.setDate(diff));
+        }
+
+        function getWeekNumber(date) {
+            return Math.ceil((date.getDate() + new Date(date.getFullYear(), date.getMonth(), 1).getDay()) / 7);
+        }
+
+        window.moveWeek = function(n) {
+            if (n === 0) {
+                currentViewDate = new Date();
+            } else {
+                currentViewDate.setDate(currentViewDate.getDate() + n * 7);
+            }
+            renderWeekView();
+        };
+
+        window.moveMonth = function(n) {
+            currentViewDate.setMonth(currentViewDate.getMonth() + n);
+            renderMonthView();
+        };
     </script>
 </body>
 </html>
